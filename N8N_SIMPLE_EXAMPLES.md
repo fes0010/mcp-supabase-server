@@ -16,7 +16,8 @@ const result = await this.helpers.httpRequest({
   json: true
 });
 
-return result.data;
+// n8n expects array of items with json property
+return result.data.map(item => ({ json: item }));
 ```
 
 ### Example 2: Get Today's Sales
@@ -36,7 +37,7 @@ const result = await this.helpers.httpRequest({
   json: true
 });
 
-return result.data;
+return result.data.map(item => ({ json: item }));
 ```
 
 ### Example 3: Get Low Stock Products
@@ -53,7 +54,7 @@ const result = await this.helpers.httpRequest({
   json: true
 });
 
-return result.data;
+return result.data.map(item => ({ json: item }));
 ```
 
 ### Example 4: Get This Month's Analytics
@@ -75,7 +76,8 @@ const result = await this.helpers.httpRequest({
   json: true
 });
 
-return result.analytics;
+// For single object, wrap in array with json property
+return [{ json: result.analytics }];
 ```
 
 ### Example 5: Insert New Customer
@@ -97,7 +99,7 @@ const result = await this.helpers.httpRequest({
   json: true
 });
 
-return result;
+return [{ json: result }];
 ```
 
 ### Example 6: Get Top 5 Selling Products
@@ -125,7 +127,7 @@ const result = await this.helpers.httpRequest({
   json: true
 });
 
-return result.data;
+return result.data.map(item => ({ json: item }));
 ```
 
 ### Example 7: Get Customer Debts
@@ -153,7 +155,7 @@ const result = await this.helpers.httpRequest({
   json: true
 });
 
-return result.data;
+return result.data.map(item => ({ json: item }));
 ```
 
 ### Example 8: List All Tables
@@ -167,7 +169,7 @@ const result = await this.helpers.httpRequest({
   json: true
 });
 
-return result.tables;
+return result.tables.map(item => ({ json: item }));
 ```
 
 ## 🔧 How to Use

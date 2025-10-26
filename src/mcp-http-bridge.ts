@@ -15,7 +15,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Environment variables
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://munene.shop';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://supabase.munene.shop';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const HOST_URL = process.env.HOST_URL || `http://localhost:${PORT}`;
 

@@ -1,40 +1,53 @@
 # ✅ Working n8n Code Node Example
 
-## Copy This - It Works!
+## Version 1: Using this.helpers.request (Recommended)
 
 ```javascript
-const BASE_URL = 'https://selfhostmcp.munene.shop';
-
-// Make the API call
-const response = await this.helpers.httpRequest({
+const response = await this.helpers.request({
   method: 'POST',
-  url: `${BASE_URL}/api/execute_sql`,
+  uri: 'https://selfhostmcp.munene.shop/api/execute_sql',
+  headers: {
+    'Content-Type': 'application/json'
+  },
   body: {
     query: 'SELECT * FROM products LIMIT 10'
   },
   json: true
 });
 
-// Check if we got data
-if (!response.data) {
-  return [{ json: { error: 'No data returned' } }];
-}
-
-// Return in n8n format
 return response.data.map(item => ({ json: item }));
 ```
 
-## More Examples That Work
+## Version 2: Using this.helpers.httpRequest
+
+```javascript
+const response = await this.helpers.httpRequest({
+  method: 'POST',
+  url: 'https://selfhostmcp.munene.shop/api/execute_sql',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    query: 'SELECT * FROM products LIMIT 10'
+  })
+});
+
+// Parse response if it's a string
+const result = typeof response === 'string' ? JSON.parse(response) : response;
+
+return result.data.map(item => ({ json: item }));
+```
+
+## More Working Examples
 
 ### Example 1: Get Today's Transactions
 
 ```javascript
-const BASE_URL = 'https://selfhostmcp.munene.shop';
 const today = new Date().toISOString().split('T')[0];
 
-const response = await this.helpers.httpRequest({
+const response = await this.helpers.request({
   method: 'POST',
-  url: `${BASE_URL}/api/get_table_data`,
+  uri: 'https://selfhostmcp.munene.shop/api/get_table_data',
   body: {
     table_name: 'transactions',
     where_clause: `created_at::date=eq.${today}`,
@@ -43,25 +56,23 @@ const response = await this.helpers.httpRequest({
   json: true
 });
 
-if (!response.data) {
+if (!response.data || response.data.length === 0) {
   return [{ json: { message: 'No transactions today' } }];
 }
 
 return response.data.map(item => ({ json: item }));
 ```
 
-### Example 2: Get Business Analytics (Single Result)
+### Example 2: Get Business Analytics
 
 ```javascript
-const BASE_URL = 'https://selfhostmcp.munene.shop';
-
 const now = new Date();
 const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
 const today = now.toISOString().split('T')[0];
 
-const response = await this.helpers.httpRequest({
+const response = await this.helpers.request({
   method: 'POST',
-  url: `${BASE_URL}/api/get_business_analytics`,
+  uri: 'https://selfhostmcp.munene.shop/api/get_business_analytics',
   body: {
     date_from: firstDay,
     date_to: today
@@ -69,33 +80,27 @@ const response = await this.helpers.httpRequest({
   json: true
 });
 
-// For single object results, wrap in array
 return [{ json: response.analytics }];
 ```
 
 ### Example 3: List All Tables
 
 ```javascript
-const BASE_URL = 'https://selfhostmcp.munene.shop';
-
-const response = await this.helpers.httpRequest({
+const response = await this.helpers.request({
   method: 'GET',
-  url: `${BASE_URL}/api/list_tables`,
+  uri: 'https://selfhostmcp.munene.shop/api/list_tables',
   json: true
 });
 
-// Response has 'tables' property
 return response.tables.map(table => ({ json: table }));
 ```
 
-### Example 4: Insert New Record
+### Example 4: Insert Customer
 
 ```javascript
-const BASE_URL = 'https://selfhostmcp.munene.shop';
-
-const response = await this.helpers.httpRequest({
+const response = await this.helpers.request({
   method: 'POST',
-  url: `${BASE_URL}/api/insert_data`,
+  uri: 'https://selfhostmcp.munene.shop/api/insert_data',
   body: {
     table_name: 'customers',
     data: {
@@ -106,66 +111,85 @@ const response = await this.helpers.httpRequest({
   json: true
 });
 
-// Return the insert result
 return [{ json: response }];
 ```
 
-### Example 5: Count Products
+### Example 5: Get Low Stock Products
 
 ```javascript
-const BASE_URL = 'https://selfhostmcp.munene.shop';
-
-const response = await this.helpers.httpRequest({
+const response = await this.helpers.request({
   method: 'POST',
-  url: `${BASE_URL}/api/execute_sql`,
+  uri: 'https://selfhostmcp.munene.shop/api/execute_sql',
+  body: {
+    query: 'SELECT name, sku, quantity FROM products WHERE quantity < 10 ORDER BY quantity ASC'
+  },
+  json: true
+});
+
+return response.data.map(item => ({ json: item }));
+```
+
+### Example 6: Count Total Products
+
+```javascript
+const response = await this.helpers.request({
+  method: 'POST',
+  uri: 'https://selfhostmcp.munene.shop/api/execute_sql',
   body: {
     query: 'SELECT COUNT(*) as total FROM products'
   },
   json: true
 });
 
-// Even single row queries return an array
-return response.data.map(item => ({ json: item }));
-// Output: [{ json: { total: 42 } }]
-```
-
-## Understanding the Response Structure
-
-All API endpoints return:
-```json
-{
-  "success": true,
-  "data": [...],      // for SQL queries and table data
-  "tables": [...],    // for list_tables
-  "analytics": {...}  // for analytics
-}
-```
-
-## Return Format Rules
-
-1. **Multiple rows** → Use `.map()`
-```javascript
+// Returns: [{ json: { total: 42 } }]
 return response.data.map(item => ({ json: item }));
 ```
 
-2. **Single object** → Wrap in array
+## Key Differences
+
+### ✅ Use `this.helpers.request`
+- Set `json: true` to auto-parse
+- Use `uri` (not `url`)
+- Pass `body` as object (not stringified)
+
+### ❌ Don't use `this.helpers.httpRequest` with `json: true`
+- It can cause the "response property should be a string" error
+- If you use it, don't set `json: true` and parse manually
+
+## Return Format
+
+Always return an array with `json` property:
+
 ```javascript
+// Multiple items
+return response.data.map(item => ({ json: item }));
+
+// Single item
 return [{ json: response.analytics }];
-```
 
-3. **Empty results** → Return message
-```javascript
-if (!response.data || response.data.length === 0) {
-  return [{ json: { message: 'No results found' } }];
+// Error handling
+if (!response.data) {
+  return [{ json: { error: 'No data' } }];
 }
 ```
 
-## Testing Your Code
+## Testing
 
-1. Add a **Code** node
-2. Copy one of the examples above
-3. Click "Execute Node" (not "Execute Workflow")
-4. Check the output panel below
+1. Add Code node
+2. Copy example above
+3. Click "Execute Node"
+4. Should see items in output ✅
 
-If you see items in the output panel, it worked! ✅
+## Troubleshooting
 
+**"response property should be a string"**
+- Use `this.helpers.request` instead of `this.helpers.httpRequest`
+- OR remove `json: true` and parse manually
+
+**"Wrong output type"**
+- Make sure you return `array.map(item => ({ json: item }))`
+- Not just `array` or `object`
+
+**"No data"**
+- Check server is running: `https://selfhostmcp.munene.shop/health`
+- Verify query syntax

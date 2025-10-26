@@ -1,109 +1,138 @@
-// n8n Code Node Example for MCP Server
-// Use this in a Code node to call your MCP server tools
+// ===== N8N CODE NODE EXAMPLES =====
+// Use these in n8n Code nodes (not fetch, use $http or this.helpers.httpRequest)
 
-// Configuration
-const MCP_URL = 'https://selfhostmcp.munene.shop/mcp';
+const BASE_URL = 'https://selfhostmcp.munene.shop';
 
-// Example 1: List all tables
-async function listTables() {
-  const response = await fetch(`${MCP_URL}/tools/list_tables`, {
+// ===== EXAMPLE 1: Execute SQL Query =====
+async function executeSQL(query, limit = 100) {
+  const response = await this.helpers.httpRequest({
     method: 'POST',
+    url: `${BASE_URL}/api/execute_sql`,
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      schema: 'public'
-    })
-  });
-  
-  return await response.json();
-}
-
-// Example 2: Execute SQL Query
-async function executeSQL(query) {
-  const response = await fetch(`${MCP_URL}/tools/execute_sql`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
+    body: {
       query: query,
-      limit: 100
-    })
+      limit: limit
+    }
   });
   
-  return await response.json();
+  return response;
 }
 
-// Example 3: Get table data with filtering
+// ===== EXAMPLE 2: Get Table Data =====
 async function getTableData(tableName, whereClause = '', limit = 50) {
-  const response = await fetch(`${MCP_URL}/tools/get_table_data`, {
+  const response = await this.helpers.httpRequest({
     method: 'POST',
+    url: `${BASE_URL}/api/get_table_data`,
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
+    body: {
       table_name: tableName,
       columns: '*',
       where_clause: whereClause,
       limit: limit,
       order_by: 'created_at',
       ascending: false
-    })
+    }
   });
   
-  return await response.json();
+  return response;
 }
 
-// Example 4: Insert data
+// ===== EXAMPLE 3: Insert Data =====
 async function insertData(tableName, data) {
-  const response = await fetch(`${MCP_URL}/tools/insert_data`, {
+  const response = await this.helpers.httpRequest({
     method: 'POST',
+    url: `${BASE_URL}/api/insert_data`,
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
+    body: {
       table_name: tableName,
       data: data
-    })
+    }
   });
   
-  return await response.json();
+  return response;
 }
 
-// Example 5: Get business analytics
+// ===== EXAMPLE 4: Get Business Analytics =====
 async function getAnalytics(dateFrom, dateTo) {
-  const response = await fetch(`${MCP_URL}/tools/get_business_analytics`, {
+  const response = await this.helpers.httpRequest({
     method: 'POST',
+    url: `${BASE_URL}/api/get_business_analytics`,
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
+    body: {
       date_from: dateFrom,
       date_to: dateTo
-    })
+    }
   });
   
-  return await response.json();
+  return response;
 }
 
-// ===== USAGE IN N8N CODE NODE =====
+// ===== EXAMPLE 5: List Tables =====
+async function listTables() {
+  const response = await this.helpers.httpRequest({
+    method: 'GET',
+    url: `${BASE_URL}/api/list_tables`,
+    headers: {
+      'Content-Type': 'application/json',
+    }
+  });
+  
+  return response;
+}
 
-// Example: Get all products
-const products = await executeSQL('SELECT * FROM products LIMIT 10');
+// ===== USAGE EXAMPLES =====
 
-// Example: Get today's transactions
+// Example 1: Get all products
+const products = await this.helpers.httpRequest({
+  method: 'POST',
+  url: `${BASE_URL}/api/execute_sql`,
+  body: {
+    query: 'SELECT * FROM products LIMIT 10'
+  },
+  json: true
+});
+
+// Example 2: Get today's transactions
 const today = new Date().toISOString().split('T')[0];
-const transactions = await getTableData('transactions', `created_at::date = '${today}'`);
+const transactions = await this.helpers.httpRequest({
+  method: 'POST',
+  url: `${BASE_URL}/api/get_table_data`,
+  body: {
+    table_name: 'transactions',
+    where_clause: `created_at::date=eq.${today}`,
+    limit: 50
+  },
+  json: true
+});
 
-// Example: Get sales analytics for this month
-const firstDay = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
-const analytics = await getAnalytics(firstDay, today);
+// Example 3: Get this month's analytics
+const now = new Date();
+const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+const analytics = await this.helpers.httpRequest({
+  method: 'POST',
+  url: `${BASE_URL}/api/get_business_analytics`,
+  body: {
+    date_from: firstDay,
+    date_to: today
+  },
+  json: true
+});
 
-// Return the results
-return {
-  products: products,
-  transactions: transactions,
-  analytics: analytics
-};
-
+// Return combined results
+return [
+  {
+    json: {
+      products: products.data,
+      transactions: transactions.data,
+      analytics: analytics.analytics
+    }
+  }
+];

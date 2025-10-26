@@ -433,6 +433,305 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
       }
 
+      case 'get_table_schema': {
+        const tableName = args?.table_name as string;
+        const includeSampleData = (args?.include_sample_data as boolean) ?? false;
+
+        if (!validateTableName(tableName)) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  error: 'Invalid table name',
+                  message: 'Table name must be a valid PostgreSQL identifier',
+                  provided: tableName
+                }, null, 2),
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        try {
+          // Get table schema using SQL query
+          const schemaQuery = `
+            SELECT
+              column_name,
+              data_type,
+              is_nullable,
+              column_default,
+              character_maximum_length,
+              numeric_precision,
+              numeric_scale
+            FROM information_schema.columns
+            WHERE table_name = '${tableName}'
+            ORDER BY ordinal_position;
+          `;
+
+          const schemaData = await makeAuthenticatedRequest('/rest/v1/rpc/exec_sql', {
+            method: 'POST',
+            body: JSON.stringify({ sql_query: schemaQuery })
+          });
+
+          let sampleData = null;
+          if (includeSampleData) {
+            try {
+              sampleData = await makeAuthenticatedRequest(`/rest/v1/${tableName}?limit=5`);
+            } catch (sampleError) {
+              sampleData = { error: 'Could not fetch sample data' };
+            }
+          }
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  table_name: tableName,
+                  schema: schemaData,
+                  sample_data: sampleData
+                }, null, 2),
+              },
+            ],
+          };
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  error: 'Failed to get table schema',
+                  message: error instanceof Error ? error.message : String(error)
+                }, null, 2),
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
+
+      case 'insert_data': {
+        const tableName = args?.table_name as string;
+        const data = args?.data as object;
+
+        if (!validateTableName(tableName)) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  error: 'Invalid table name',
+                  message: 'Table name must be a valid PostgreSQL identifier',
+                  provided: tableName
+                }, null, 2),
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        if (!data || typeof data !== 'object') {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  error: 'Invalid data',
+                  message: 'Data must be a non-empty object'
+                }, null, 2),
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        try {
+          const result = await makeAuthenticatedRequest(`/rest/v1/${tableName}`, {
+            method: 'POST',
+            body: JSON.stringify(data)
+          });
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  success: true,
+                  inserted: result
+                }, null, 2),
+              },
+            ],
+          };
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  error: 'Failed to insert data',
+                  message: error instanceof Error ? error.message : String(error)
+                }, null, 2),
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
+
+      case 'update_data': {
+        const tableName = args?.table_name as string;
+        const data = args?.data as object;
+        const whereClause = args?.where_clause as string;
+
+        if (!validateTableName(tableName)) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  error: 'Invalid table name',
+                  message: 'Table name must be a valid PostgreSQL identifier',
+                  provided: tableName
+                }, null, 2),
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        if (!data || typeof data !== 'object') {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  error: 'Invalid data',
+                  message: 'Data must be a non-empty object'
+                }, null, 2),
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        if (!whereClause || typeof whereClause !== 'string') {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  error: 'Missing where clause',
+                  message: 'WHERE clause is required for updates'
+                }, null, 2),
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        try {
+          const updateQuery = `${tableName}?${whereClause}`;
+          const result = await makeAuthenticatedRequest(`/rest/v1/${updateQuery}`, {
+            method: 'PATCH',
+            body: JSON.stringify(data)
+          });
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  success: true,
+                  updated: result
+                }, null, 2),
+              },
+            ],
+          };
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  error: 'Failed to update data',
+                  message: error instanceof Error ? error.message : String(error)
+                }, null, 2),
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
+
+      case 'delete_data': {
+        const tableName = args?.table_name as string;
+        const whereClause = args?.where_clause as string;
+
+        if (!validateTableName(tableName)) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  error: 'Invalid table name',
+                  message: 'Table name must be a valid PostgreSQL identifier',
+                  provided: tableName
+                }, null, 2),
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        if (!whereClause || typeof whereClause !== 'string') {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  error: 'Missing where clause',
+                  message: 'WHERE clause is required for deletions'
+                }, null, 2),
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        try {
+          const deleteQuery = `${tableName}?${whereClause}`;
+          const result = await makeAuthenticatedRequest(`/rest/v1/${deleteQuery}`, {
+            method: 'DELETE'
+          });
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  success: true,
+                  deleted: result
+                }, null, 2),
+              },
+            ],
+          };
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  error: 'Failed to delete data',
+                  message: error instanceof Error ? error.message : String(error)
+                }, null, 2),
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
+
       case 'get_business_analytics': {
         const dateFrom = args?.date_from as string;
         const dateTo = args?.date_to as string;
@@ -480,12 +779,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           const analytics = {
             date_range: { from: dateFrom, to: dateTo },
             total_transactions: Array.isArray(transactions) ? transactions.length : 0,
-            total_revenue: Array.isArray(transactions) ? 
+            total_revenue: Array.isArray(transactions) ?
               transactions.reduce((sum: number, t: any) => sum + (t.total_amount || 0), 0) : 0,
             total_products: Array.isArray(products) ? products.length : 0,
-            total_inventory_value: Array.isArray(products) ? 
+            total_inventory_value: Array.isArray(products) ?
               products.reduce((sum: number, p: any) => sum + ((p.quantity || 0) * (p.buying_price_per_base_unit || 0)), 0) : 0,
-            low_stock_products: Array.isArray(products) ? 
+            low_stock_products: Array.isArray(products) ?
               products.filter((p: any) => (p.quantity || 0) < (p.min_stock_level || 10)).length : 0
           };
 

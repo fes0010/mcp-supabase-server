@@ -832,7 +832,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 });
 
-// MCP endpoint for n8n
+// MCP endpoint for n8n (SSE)
 app.get('/mcp', async (req, res) => {
   try {
     const transport = new SSEServerTransport('/mcp', res);
@@ -841,6 +841,152 @@ app.get('/mcp', async (req, res) => {
   } catch (error) {
     console.error('MCP connection error:', error);
     res.status(500).json({ error: 'MCP connection failed' });
+  }
+});
+
+// REST API endpoints for direct tool calls (for Code nodes)
+app.post('/api/execute_sql', async (req, res) => {
+  try {
+    const { query, limit = 100 } = req.body;
+    
+    if (!query) {
+      return res.status(400).json({ error: 'SQL query is required' });
+    }
+
+    let finalQuery = query.trim();
+    const queryType = finalQuery.toLowerCase().split(' ')[0];
+    
+    if (queryType === 'select' && !/\blimit\s+\d+/i.test(finalQuery)) {
+      finalQuery += ` LIMIT ${limit}`;
+    }
+
+    const data = await makeAuthenticatedRequest('/rest/v1/rpc/exec_sql', {
+      method: 'POST',
+      body: JSON.stringify({ sql_query: finalQuery })
+    });
+    
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ 
+      error: 'SQL execution failed', 
+      message: error instanceof Error ? error.message : String(error) 
+    });
+  }
+});
+
+app.post('/api/get_table_data', async (req, res) => {
+  try {
+    const { table_name, columns = '*', where_clause, limit = 50, order_by, ascending = false } = req.body;
+    
+    if (!validateTableName(table_name)) {
+      return res.status(400).json({ error: 'Invalid table name' });
+    }
+
+    let endpoint = `/rest/v1/${table_name}?select=${columns}&limit=${limit}`;
+    
+    if (where_clause) {
+      endpoint += `&${where_clause}`;
+    }
+    
+    if (order_by) {
+      endpoint += `&order=${order_by}.${ascending ? 'asc' : 'desc'}`;
+    }
+    
+    const data = await makeAuthenticatedRequest(endpoint);
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ 
+      error: 'Failed to get table data', 
+      message: error instanceof Error ? error.message : String(error) 
+    });
+  }
+});
+
+app.post('/api/insert_data', async (req, res) => {
+  try {
+    const { table_name, data } = req.body;
+    
+    if (!validateTableName(table_name)) {
+      return res.status(400).json({ error: 'Invalid table name' });
+    }
+
+    if (!data || typeof data !== 'object') {
+      return res.status(400).json({ error: 'Data must be a non-empty object' });
+    }
+
+    const result = await makeAuthenticatedRequest(`/rest/v1/${table_name}`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+
+    res.json({ success: true, inserted: result });
+  } catch (error) {
+    res.status(500).json({ 
+      error: 'Failed to insert data', 
+      message: error instanceof Error ? error.message : String(error) 
+    });
+  }
+});
+
+app.get('/api/list_tables', async (req, res) => {
+  try {
+    const knownTables = [
+      { table_name: 'profiles', description: 'User profiles and roles', category: 'auth' },
+      { table_name: 'products', description: 'Product inventory', category: 'inventory' },
+      { table_name: 'transactions', description: 'Sales transactions', category: 'sales' },
+      { table_name: 'transaction_items', description: 'Individual items in transactions', category: 'sales' },
+      { table_name: 'customers', description: 'Customer information', category: 'customers' },
+      { table_name: 'expenses', description: 'Business expenses', category: 'financial' },
+      { table_name: 'debt_payments', description: 'Customer debt payments', category: 'financial' },
+      { table_name: 'stock_history', description: 'Product stock changes', category: 'inventory' },
+    ];
+    
+    res.json({ success: true, tables: knownTables });
+  } catch (error) {
+    res.status(500).json({ 
+      error: 'Failed to list tables', 
+      message: error instanceof Error ? error.message : String(error) 
+    });
+  }
+});
+
+app.post('/api/get_business_analytics', async (req, res) => {
+  try {
+    const { date_from, date_to } = req.body;
+
+    if (date_from && !validateDate(date_from)) {
+      return res.status(400).json({ error: 'Invalid date_from format. Use YYYY-MM-DD' });
+    }
+
+    if (date_to && !validateDate(date_to)) {
+      return res.status(400).json({ error: 'Invalid date_to format. Use YYYY-MM-DD' });
+    }
+
+    let transactionQuery = 'transactions?select=*';
+    if (date_from) transactionQuery += `&created_at=gte.${date_from}`;
+    if (date_to) transactionQuery += `&created_at=lte.${date_to}`;
+
+    const transactions = await makeAuthenticatedRequest(`/rest/v1/${transactionQuery}`);
+    const products = await makeAuthenticatedRequest('/rest/v1/products?select=*');
+
+    const analytics = {
+      date_range: { from: date_from, to: date_to },
+      total_transactions: Array.isArray(transactions) ? transactions.length : 0,
+      total_revenue: Array.isArray(transactions) ?
+        transactions.reduce((sum: number, t: any) => sum + (t.total_amount || 0), 0) : 0,
+      total_products: Array.isArray(products) ? products.length : 0,
+      total_inventory_value: Array.isArray(products) ?
+        products.reduce((sum: number, p: any) => sum + ((p.quantity || 0) * (p.buying_price_per_base_unit || 0)), 0) : 0,
+      low_stock_products: Array.isArray(products) ?
+        products.filter((p: any) => (p.quantity || 0) < (p.min_stock_level || 10)).length : 0
+    };
+
+    res.json({ success: true, analytics });
+  } catch (error) {
+    res.status(500).json({ 
+      error: 'Analytics failed', 
+      message: error instanceof Error ? error.message : String(error) 
+    });
   }
 });
 

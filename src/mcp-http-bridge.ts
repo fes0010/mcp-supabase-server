@@ -833,7 +833,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 // MCP endpoint for n8n
-app.use('/mcp', async (req, res) => {
+app.get('/mcp', async (req, res) => {
   try {
     const transport = new SSEServerTransport('/mcp', res);
     await server.connect(transport);

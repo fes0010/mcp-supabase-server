@@ -35,6 +35,7 @@ https://github.com/fes0010/mcp-supabase-server
    PORT=3001
    SUPABASE_URL=https://munene.shop
    SUPABASE_SERVICE_ROLE_KEY=your-actual-service-role-key
+   HOST_URL=https://mcp-api.yourdomain.com
    ```
 
 5. **Configure Domain:**
@@ -66,6 +67,7 @@ NODE_ENV=production
 PORT=3001
 SUPABASE_URL=https://munene.shop
 SUPABASE_SERVICE_ROLE_KEY=your-actual-service-role-key
+HOST_URL=https://mcp-api.yourdomain.com
 EOF
 ```
 

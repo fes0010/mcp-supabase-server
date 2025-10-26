@@ -146,6 +146,7 @@ SUPABASE_URL=https://your-supabase-instance.com
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 PORT=3001                    # Optional, defaults to 3001
 NODE_ENV=production          # For production deployments
+HOST_URL=https://your-domain.com  # For production deployments (replaces localhost in URLs)
 ```
 
 ## 🔍 Health Check

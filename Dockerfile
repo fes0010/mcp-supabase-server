@@ -14,6 +14,9 @@ COPY . .
 # Build the application
 RUN npm run build
 
+# Set default environment variable for HOST_URL
+ENV HOST_URL=""
+
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs
 RUN adduser -S nodejs -u 1001
